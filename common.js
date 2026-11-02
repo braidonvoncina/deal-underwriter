@@ -2,12 +2,14 @@
 const PAGES = [
   { href: 'index.html', name: 'Residential', sub: 'Australia' },
   { href: 'commercial-au.html', name: 'Commercial and multifamily', sub: 'Australia' },
-  { name: 'Residential', sub: 'United States', soon: true },
+  { href: 'us-residential.html', name: 'Residential', sub: 'United States' },
   { name: 'Commercial', sub: 'United States', soon: true },
 ];
 
+// US pages set window.CURRENCY = ['en-US', 'USD'] before loading this file.
+const [LOCALE, CCY] = window.CURRENCY || ['en-AU', 'AUD'];
 const $ = (n, signed) => {
-  const s = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 }).format(Math.abs(Math.round(n)));
+  const s = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: CCY, maximumFractionDigits: 0 }).format(Math.abs(Math.round(n)));
   return n < -0.5 ? '-' + s : signed && n > 0.5 ? '+' + s : s;
 };
 const pc = (n, d = 2) => (isFinite(n) ? n.toFixed(d) : '0.00') + '%';

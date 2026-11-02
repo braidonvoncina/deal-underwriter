@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1c1713">
+<meta name="description" content="US rental property underwriting: cash flow, cap rate, DSCR, cash-on-cash, depreciation, passive loss limits, sale taxes and IRR, with a plain-English note on how each figure is worked out.">
+<title>US Deal Underwriter</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant:wght@500;600;700&family=Montserrat:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="topbar"><div class="eyebrow">United States residential</div><nav id="nav" aria-label="Calculators"></nav></div>
+    <h1>US Deal Underwriter</h1>
+    <p>Enter a rental with a 30-year fixed loan and see cash flow, cap rate, DSCR and after-tax return including depreciation and the tax on sale. Each section explains how the figure is worked out.</p>
+    <button id="theme" class="themebtn" type="button"></button>
+  </header>
+  <div class="layout">
+    <aside class="card rail" aria-label="Deal inputs">
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div id="panels"></div>
+    </aside>
+    <main class="results" id="results"></main>
+  </div>
+  <footer>Illustrative only. Not financial, tax or legal advice. Federal tax figures are for the 2026 tax year (IRS Rev. Proc. 2025-32). Property tax and state income tax rates are rough placeholders you should replace with your own. Rates, closing costs and tax rules change, so confirm with a lender and a tax professional.</footer>
+</div>
+<div class="pinbar" id="pinbar"></div>
+<script>window.CURRENCY = ["en-US", "USD"];</script>
+<script src="common.js"></script>
+<script src="calc-us.js"></script>
+<script src="us-residential.js"></script>
+</body>
+</html>
