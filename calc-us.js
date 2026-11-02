@@ -45,12 +45,38 @@ function irr(cfs) {
   return (lo + hi) / 2 * 100;
 }
 
+// Depreciation by year, split into the building (straight line over `life`) and short-life parts from a cost segregation study.
+// Short-life parts: bonusPct is deducted in year 1, the rest straight line over SEG_LIFE years (a blended simplification of 5, 7 and 15 year items).
+const SEG_LIFE = 10;
+function usDep(i, basis, life, N) {
+  const D = basis * (1 - i.landPct / 100), seg = i.costSeg ? D * i.segPct / 100 : 0;
+  const bonus = seg * (i.bonusPct || 0) / 100, rem = seg - bonus, b = [], s = [];
+  for (let t = 1; t <= N; t++) { b.push((D - seg) / life); s.push((t === 1 ? bonus : 0) + (t <= SEG_LIFE ? rem / SEG_LIFE : 0)); }
+  return { b, s, seg, D, plain: D / life };
+}
+// Tax on a sale. Recapture of short-life parts is ordinary income; building recapture is capped at 25%; the rest is capital gain.
+// With a 1031 exchange only boot (cash taken out) is recognised, recapture first. Suspended passive losses are not released in an exchange.
+function usSaleTax(i, gain, depB, depS, base, susp) {
+  const sr = i.stateTax / 100, thr = US_TAX.niit[i.fs];
+  const parts = (g, off = 0) => {
+    const rs = Math.min(g, depS), rb = Math.min(g - rs, depB), cg = g - rs - rb, rt = rs - off;
+    const taxS = fedTax(base + rt, i.fs) - fedTax(base, i.fs);
+    const taxB = Math.min(rb * US_TAX.recapMax, fedTax(base + rt + rb, i.fs) - fedTax(base + rt, i.fs));
+    const lt = ltcgTax(base + rt + rb, cg, i.fs), niit = 0.038 * Math.min(g, Math.max(0, i.otherIncome + g - thr)), state = g * sr;
+    return { recapS: rs, recapB: rb, capGain: cg, taxS, taxB, lt, niit, state, total: taxS + taxB + lt + niit + state };
+  };
+  const rec = i.exchange ? Math.min(gain, i.boot || 0) : gain, off = i.exchange ? 0 : Math.min(susp, Math.min(rec, depS)), p = parts(rec, off), full = parts(gain);
+  const left = i.exchange ? 0 : susp - off;
+  const suspSaving = i.exchange ? 0 : off * sr + fedTax(base, i.fs) - fedTax(Math.max(0, base - left), i.fs) + left * sr; // federal effect of `off` is already inside p.total
+  return { ...p, recognized: rec, suspSaving, saleTax: p.total - suspSaving, deferred: full.total - p.total, deferredGain: gain - rec };
+}
+
 // o: optional stress overrides { rateAdd, vacAdd, rentMult, expMult, noGrowth }
 function ucalc(i, o = {}) {
   const rate = i.rate + (o.rateAdd || 0), N = Math.min(30, Math.max(1, Math.round(i.hold)));
   const loan = i.price * (1 - i.down / 100), down = i.price - loan, closing = i.price * i.closing / 100;
   const cash = down + closing + i.rehab, basis = i.price + closing + i.rehab;
-  const dep = basis * (1 - i.landPct / 100) / US_TAX.life;
+  const D = usDep(i, basis, US_TAX.life, N);
   const pay = usPmt(loan, rate, i.term), m = rate / 1200, x = o.expMult ?? 1, app = o.noGrowth ? 0 : i.appreciation;
   const passive = Math.max(0, US_TAX.passive.allowance - 0.5 * Math.max(0, i.otherIncome - US_TAX.passive.phaseStart));
   const base = baseIncome(i), niitThr = US_TAX.niit[i.fs], sr = i.stateTax / 100;
@@ -70,7 +96,7 @@ function ucalc(i, o = {}) {
     }
     const ds = int + prin, cf = noi - ds - capex;
     // Rental income for tax: NOI less interest less depreciation. Losses are limited by the passive loss rules.
-    const taxable = noi - int - dep;
+    const dep = D.b[t - 1] + D.s[t - 1], taxable = noi - int - dep;
     let net;
     if (taxable < 0) { const use = Math.min(-taxable, passive); susp += -taxable - use; net = -use; }
     else { const use = Math.min(susp, taxable); susp -= use; net = taxable - use; }
@@ -81,21 +107,18 @@ function ucalc(i, o = {}) {
   }
   const y1 = rows[0], last = rows[N - 1];
   const value = i.price * (1 + app / 100) ** N, sellCost = value * i.sellCost / 100;
-  const adjBasis = basis - dep * N, gain = Math.max(0, value - sellCost - adjBasis);
-  const recap = Math.min(gain, dep * N), capGain = gain - recap;
-  const recapTax = Math.min(recap * US_TAX.recapMax, fedTax(base + recap, i.fs) - fedTax(base, i.fs));
-  const ltTax = ltcgTax(base + recap, capGain, i.fs);
-  const niitSale = 0.038 * Math.min(gain, Math.max(0, i.otherIncome + gain - niitThr));
-  const stateSale = gain * sr;
-  const suspSaving = fedTax(base, i.fs) - fedTax(Math.max(0, base - last.susp), i.fs) + last.susp * sr;
-  const saleTax = recapTax + ltTax + niitSale + stateSale - suspSaving;
+  const depB = D.b.reduce((x, y) => x + y, 0), depS = D.s.reduce((x, y) => x + y, 0), dep = rows[0].dep;
+  const adjBasis = basis - depB - depS, gain = Math.max(0, value - sellCost - adjBasis);
+  const T = usSaleTax(i, gain, depB, depS, base, last.susp);
+  const { recognized, deferred, deferredGain, suspSaving, saleTax, niit: niitSale, state: stateSale, lt: ltTax } = T;
+  const recap = T.recapS + T.recapB, recapTax = T.taxS + T.taxB, capGain = T.capGain;
   const net = value - sellCost - last.bal - saleTax;
   const flows = [-cash, ...rows.map((r) => r.cfAfter)];
   flows[N] += net;
   const totalProfit = flows.reduce((a, b) => a + b, 0);
   const gpi = i.rent * 12 * (o.rentMult ?? 1);
   return {
-    loan, down, closing, cash, basis, dep, pay, rows, N, y1, last, passive, base,
+    loan, down, closing, cash, basis, dep, depPlain: D.plain, seg: D.seg, pay, rows, N, y1, last, passive, base, T, recognized, deferred, deferredGain,
     value, sellCost, adjBasis, gain, recap, capGain, recapTax, ltTax, niitSale, stateSale, suspSaving, saleTax, net, totalProfit,
     cap: y1.noi / i.price * 100,
     coc: y1.cf / cash * 100, cocAfter: y1.cfAfter / cash * 100,

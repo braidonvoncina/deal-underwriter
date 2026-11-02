@@ -57,6 +57,7 @@ details.sec[open]>summary::after{content:"\2212"}
 .k em{font-style:normal;font-size:11.5px;color:var(--muted)}
 .pos{color:var(--pos)}.neg{color:var(--neg)}
 .tbl{overflow-x:auto}
+.tbl.snug td,.tbl.snug th{padding:8px 5px;font-size:12.5px}
 table{width:100%;border-collapse:collapse;font-size:13.5px}
 th{font:500 12px var(--sans);color:var(--muted);text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
 td{padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}

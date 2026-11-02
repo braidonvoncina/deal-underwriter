@@ -37,7 +37,7 @@ function uccalc(i, o = {}) {
   const rate = i.rate + (o.rateAdd || 0), exitCap = Math.max(0.5, i.exitCap + (o.exitCapAdd || 0));
   const N = Math.min(30, Math.max(1, Math.round(i.hold)));
   const loan = i.price * i.ltv / 100, closing = i.price * i.closing / 100, cash = i.price - loan + closing;
-  const basis = i.price + closing, life = ucLife(i), dep = basis * (1 - i.landPct / 100) / life;
+  const basis = i.price + closing, life = ucLife(i), D = usDep(i, basis, life, N);
   const { rows: sched, pay } = ucSchedule(i, rate, N);
   const passive = Math.max(0, US_TAX.passive.allowance - 0.5 * Math.max(0, i.otherIncome - US_TAX.passive.phaseStart));
   const base = baseIncome(i), niitThr = US_TAX.niit[i.fs], sr = i.stateTax / 100;
@@ -45,7 +45,7 @@ function uccalc(i, o = {}) {
   let susp = 0;
   for (let t = 1; t <= N; t++) {
     const n = ucNoi(i, t, o), s = sched[t - 1], cf = n.noi - n.capex - s.ds;
-    const taxable = n.noi - s.int - dep;
+    const dep = D.b[t - 1] + D.s[t - 1], taxable = n.noi - s.int - dep;
     let net;
     if (taxable < 0) { const use = Math.min(-taxable, passive); susp += -taxable - use; net = -use; }
     else { const use = Math.min(susp, taxable); susp -= use; net = taxable - use; }
@@ -56,18 +56,17 @@ function uccalc(i, o = {}) {
   }
   const y1 = rows[0], last = rows[N - 1];
   const fwd = ucNoi(i, N + 1, o).noi, value = fwd / (exitCap / 100), sellCost = value * i.sellCost / 100;
-  const gain = Math.max(0, value - sellCost - (basis - dep * N)), recap = Math.min(gain, dep * N), capGain = gain - recap;
-  const recapTax = Math.min(recap * US_TAX.recapMax, fedTax(base + recap, i.fs) - fedTax(base, i.fs));
-  const ltTax = ltcgTax(base + recap, capGain, i.fs);
-  const niitSale = 0.038 * Math.min(gain, Math.max(0, i.otherIncome + gain - niitThr)), stateSale = gain * sr;
-  const suspSaving = fedTax(base, i.fs) - fedTax(Math.max(0, base - last.susp), i.fs) + last.susp * sr;
-  const saleTax = recapTax + ltTax + niitSale + stateSale - suspSaving;
+  const depB = D.b.reduce((x, y) => x + y, 0), depS = D.s.reduce((x, y) => x + y, 0), dep = rows[0].dep;
+  const gain = Math.max(0, value - sellCost - (basis - depB - depS));
+  const T = usSaleTax(i, gain, depB, depS, base, last.susp);
+  const { recognized, deferred, deferredGain, suspSaving, saleTax, niit: niitSale, state: stateSale, lt: ltTax } = T;
+  const recap = T.recapS + T.recapB, recapTax = T.taxS + T.taxB, capGain = T.capGain;
   const net = value - sellCost - last.bal - saleTax;
   const flows = [-cash, ...rows.map((r) => r.cfAfter)];
   flows[N] += net;
   const piYear = pay * 12, units = ucUnits(i);
   return {
-    loan, closing, cash, basis, life, dep, rows, N, y1, last, passive, base, fwd, exitCap, value, sellCost, gain, recap, capGain,
+    loan, closing, cash, basis, life, dep, depPlain: D.plain, seg: D.seg, T, recognized, deferred, deferredGain, rows, N, y1, last, passive, base, fwd, exitCap, value, sellCost, gain, recap, capGain,
     recapTax, ltTax, niitSale, stateSale, suspSaving, saleTax, net, piYear, ioYear: y1.ds,
     totalProfit: flows.reduce((a, b) => a + b, 0), multiple: flows.slice(1).reduce((a, b) => a + b, 0) / cash, irr: irr(flows),
     cap: y1.noi / i.price * 100, coc: y1.cf / cash * 100,

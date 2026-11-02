@@ -6,8 +6,9 @@ const K = {
   ltv: 65, rate: 6.75, amort: 30, ioYears: 0,
   hold: 7, rentGrowth: 3, expGrowth: 3, exitCap: 6.75, sellCost: 3,
   fs: 'single', otherIncome: 90000, stateTax: 3.5,
+  costSeg: false, segPct: 25, bonusPct: 100, exchange: false, boot: 0,
 };
-['sum', 'check', 'deals', 'noi', 'debt'].forEach((id) => openSecs.add(id));
+['sum', 'check', 'deals', 'noi', 'debt', 'adv'].forEach((id) => openSecs.add(id));
 const TYPES = { multi: 'Multifamily', retail: 'Retail', office: 'Office', industrial: 'Industrial', mixed: 'Mixed use' };
 const PRESETS = {
   multi: { vacancy: 5, creditLoss: 1, recovery: 0, mgmt: 5, rentBasis: 'm', landPct: 20 },
@@ -60,6 +61,11 @@ const TABS = [
     ['fs', 'Filing status', 'sel', [['single', 'Single'], ['mfj', 'Married filing jointly']]],
     ['otherIncome', 'Your other income /yr', '$', null, '', 'Wages and other income, before deductions'],
     ['stateTax', 'State income tax', '%', null, '', 'Rough flat rate'],
+    ['costSeg', 'Cost segregation study', 'sel', [['0', 'Off'], ['1', 'On']], '', 'Splits the building into short-life parts for faster deductions'],
+    ['segPct', 'Share reclassified as short-life', '%', null, '', 'Often 15 to 30% of the building'],
+    ['bonusPct', 'Bonus depreciation', '%', null, '', 'Share of short-life parts deducted in year 1'],
+    ['exchange', '1031 exchange at sale', 'sel', [['0', 'Off'], ['1', 'On']], '', 'Defers the sale taxes into a replacement property'],
+    ['boot', 'Cash taken out (taxable)', '$', null, '', 'Cash or other property you keep in an exchange'],
   ]],
 ];
 
@@ -212,15 +218,32 @@ function render() {
       ${kpi('Equity multiple', x2(c.multiple), 'Cash back ÷ cash in')}
     </div>
     <div class="two"><div class="col"><h4>Sale</h4>${row('Sale price', $(c.value))}${row(`Selling costs (${K.sellCost}%)`, $(-c.sellCost))}${row('Repay loan', $(-c.last.bal))}${row('Taxes on the sale', $(-c.saleTax))}${row('<b>Cash you keep</b>', $(c.net))}</div>
-    <div class="col"><h4>Taxes on the sale</h4>${row('Gain on sale', $(c.gain))}${row('Depreciation recapture', $(c.recap))}${row('Recapture tax (max 25%)', $(c.recapTax))}${row('Capital gains tax (0/15/20%)', $(c.ltTax))}${row('Investment income tax (3.8%)', $(c.niitSale))}${row('State income tax', $(c.stateSale))}${c.suspSaving ? row('Released passive losses', $(-c.suspSaving)) : ''}</div></div>
+    <div class="col"><h4>Taxes on the sale</h4>${row('Gain on sale', $(c.gain))}${row('Depreciation recapture', $(c.recap))}${row('Recapture tax (25% cap on building)', $(c.recapTax))}${row('Capital gains tax (0/15/20%)', $(c.ltTax))}${row('Investment income tax (3.8%)', $(c.niitSale))}${row('State income tax', $(c.stateSale))}${c.suspSaving ? row('Released passive losses', $(-c.suspSaving)) : ''}</div></div>
     ${learn(`<p>A buyer values the building on the NOI it will earn next, so <code>sale price = next year's NOI / exit cap rate</code>. A small change in the exit cap rate moves the price a lot, which is why the stress tests flex it.</p>
       <p>Gain = sale price - selling costs - (what you paid and spent - depreciation claimed). The part equal to depreciation claimed is taxed at your ordinary rate up to 25%; the rest at 0, 15 or 20%, plus a 3.8% investment income tax above $200,000 (single) or $250,000 (joint). A 1031 exchange, which can defer these taxes, is not modelled. Federal figures: ${US_TAX.asOf}.</p>`)}`));
 
+  const cs = K.costSeg, ex = K.exchange;
+  if (cs || ex) {
+    const rowsA = [];
+    let body = '';
+    if (cs) {
+      const p = uccalc({ ...K, costSeg: false });
+      const side = (z, t) => `<div class="col"><h4>${t}</h4>${row('Year 1 depreciation', $(z.dep))}${row('Year 1 taxable income', $(z.y1.taxable))}${row('Year 1 tax effect', $(z.y1.tax))}${row('Suspended losses', $(z.last.susp))}${row('Recapture tax at sale', $(z.recapTax))}${row('Cash kept at sale', $(z.net))}${row('IRR after tax', pcn(z.irr), cls(z.irr))}</div>`;
+      body += `<h4>Cost segregation</h4><div class="two">${side(p, 'Without')}${side(c, 'With')}</div>`;
+    }
+    if (ex) {
+      body += `<h4>1031 exchange</h4><div class="two"><div class="col">${row('Gain on sale', $(c.gain))}${row('Gain deferred', $(c.deferredGain))}${row('Gain taxed now (boot)', $(c.recognized))}</div>
+        <div class="col">${row('Sale taxes now', $(c.saleTax))}${row('<b>Tax deferred, still owed later</b>', $(c.deferred))}</div></div>`;
+    }
+    s.push(sec('adv', 'Cost segregation and 1031 effects', body + learn(`<p>This compares the same deal with the switch off. Cost segregation moves deductions earlier, but rental losses above your allowance are suspended, and the extra depreciation comes back as ordinary-rate tax when you sell. A 1031 exchange defers sale taxes: the IRR shown assumes you keep the equity without paying them, so treat it as flattering. See Tax topics to learn.</p>`)));
+  }
   const rowsS = UCSTRESS.map(([name, o]) => ({ name, z: uccalc(K, o) }));
   s.push(sec('stress', 'Stress tests', `
     <div class="tbl"><table><tr><th>Scenario</th><th class="r">DSCR</th><th class="r">Cash-on-cash</th><th class="r">IRR</th><th class="r">Year 1 cash flow</th></tr>
       ${rowsS.map(({ name, z }) => `<tr><td>${name}</td><td class="r ${z.dscr < 1.2 ? 'neg' : ''}">${x2(z.dscr)}</td><td class="r ${cls(z.coc)}">${pcn(z.coc)}</td><td class="r ${cls(z.irr)}">${pcn(z.irr)}</td><td class="r ${cls(z.y1.cf)}">${$(z.y1.cf)}</td></tr>`).join('')}</table></div>
     ${learn(`<p>Each line changes one thing and reruns the deal. Commercial deals can look fine in the base case and fall apart under a small change because the loan is large compared with income. Look for the scenario that pushes DSCR under 1.2x or IRR below zero. Rate lines show a higher rate on the loan, which matters at refinance.</p>`)}`));
+
+  s.push(usTopics());
 
   document.getElementById('results').innerHTML = s.join('');
   document.getElementById('pinbar').innerHTML =
