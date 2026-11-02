@@ -5,7 +5,7 @@ const C = {
   rates: 9000, insurance: 7500, repairs: 12000, otherOpex: 8000, mgmtPct: 6, capexPct: 3, acq: 40000,
   lvr: 65, rate: 6.9, term: 25, ioYears: 3,
   hold: 5, rentGrowth: 3, expGrowth: 3, exitCap: 6.75, sellCost: 2,
-  tax: 37, construction: 1092000, pne: 104000,
+  owner: 'ind', tax: 37, construction: 1092000, pne: 104000,
 };
 ['sum', 'check', 'deals', 'noi', 'debt'].forEach((id) => openSecs.add(id));
 const TYPES = { multi: 'Multifamily', retail: 'Retail', office: 'Office', industrial: 'Industrial', mixed: 'Mixed use' };
@@ -54,9 +54,9 @@ const TABS = [
     ['sellCost', 'Selling costs', '%', null, 'full', 'Agent, legal and marketing, as a share of the sale price'],
   ]],
   ['Tax', [
-    ['tax', 'Owner and tax rate', 'sel', [['0', 'Tax-free (0%)'], ['15', 'SMSF (15%, one-third CGT discount)'], ['19', '$18,201 to $45,000 (19%)'],
-      ['25', 'Company base rate (25%, no CGT discount)'], ['30', 'Company (30%, no CGT discount)'], ['32.5', '$45,001 to $120,000 (32.5%)'],
-      ['37', '$120,001 to $180,000 (37%)'], ['45', '$180,001+ (45%)']], 'full'],
+    ['owner', 'Who owns it', 'sel', [['ind', 'Individual (50% CGT discount)'], ['smsf', 'Super fund (one-third CGT discount)'], ['co', 'Company (no CGT discount)']], 'full'],
+    ['tax', 'Tax rate on the income', 'sel', [['0', 'Tax-free (0%)'], ['15', 'Super fund (15%) or $18,201 to $45,000'], ['25', 'Company base rate (25%)'], ['30', 'Company 30% or $45,001 to $135,000'],
+      ['37', '$135,001 to $190,000 (37%)'], ['45', '$190,001+ (45%)']], 'full', 'The Medicare levy is not included'],
     ['construction', 'Building construction value', '$', null, '', 'Capital works deduction, 2.5% a year'],
     ['pne', 'Plant and equipment', '$', null, '', 'Deducted at 20% of the remaining value'],
   ]],

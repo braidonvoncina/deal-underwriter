@@ -12,12 +12,15 @@ const US_TAX = {
   passive: { allowance: 25000, phaseStart: 100000 }, // IRC 469(i): loses 50 cents per $ of AGI over 100k
   life: 27.5, recapMax: 0.25,
 };
-// Rough placeholders [name, effective property tax % of value, top-ish state income tax %]. Edit in the app.
+// [name, effective property tax % of owner-occupied value, state income tax % for a middle-income filer].
+// Property tax: Tax Foundation "Property Taxes by State and County, 2026" (2024 ACS data), read Nov 2026; XX is a rounded national placeholder.
+// Income tax: flat rates from Tax Foundation "State Individual Income Tax Rates and Brackets, 2026". CA, NY, NJ are graduated, so those are
+// mid-bracket placeholders (top rates are 13.3, 10.9, 10.75). WA taxes only capital gains (7%), not modelled. Edit the rate for your own income.
 const US_STATES = {
-  TX: ['Texas', 1.6, 0], FL: ['Florida', 0.9, 0], CA: ['California', 0.75, 9.3], NY: ['New York', 1.4, 6], NJ: ['New Jersey', 2.2, 6.4],
-  IL: ['Illinois', 2.0, 4.95], OH: ['Ohio', 1.4, 3.5], PA: ['Pennsylvania', 1.4, 3.07], GA: ['Georgia', 0.9, 5.39], NC: ['North Carolina', 0.8, 4.25],
-  AZ: ['Arizona', 0.6, 2.5], TN: ['Tennessee', 0.6, 0], CO: ['Colorado', 0.5, 4.4], WA: ['Washington', 0.85, 0], MI: ['Michigan', 1.3, 4.25],
-  IN: ['Indiana', 0.8, 3.0], MO: ['Missouri', 0.95, 4.7], NV: ['Nevada', 0.5, 0], XX: ['Other state', 1.0, 5],
+  TX: ['Texas', 1.40, 0], FL: ['Florida', 0.78, 0], CA: ['California', 0.70, 9.3], NY: ['New York', 1.30, 6], NJ: ['New Jersey', 1.88, 6.4],
+  IL: ['Illinois', 1.88, 4.95], OH: ['Ohio', 1.36, 2.75], PA: ['Pennsylvania', 1.26, 3.07], GA: ['Georgia', 0.79, 5.19], NC: ['North Carolina', 0.66, 3.99],
+  AZ: ['Arizona', 0.48, 2.5], TN: ['Tennessee', 0.52, 0], CO: ['Colorado', 0.50, 4.4], WA: ['Washington', 0.75, 0], MI: ['Michigan', 1.19, 4.25],
+  IN: ['Indiana', 0.76, 2.95], MO: ['Missouri', 0.89, 4.7], NV: ['Nevada', 0.50, 0], XX: ['Other state', 1.0, 5],
 };
 
 const usPmt = (P, rate, yrs) => {
@@ -78,7 +81,7 @@ function ucalc(i, o = {}) {
   const cash = down + closing + i.rehab, basis = i.price + closing + i.rehab;
   const D = usDep(i, basis, US_TAX.life, N);
   const pay = usPmt(loan, rate, i.term), m = rate / 1200, x = o.expMult ?? 1, app = o.noGrowth ? 0 : i.appreciation;
-  const passive = Math.max(0, US_TAX.passive.allowance - 0.5 * Math.max(0, i.otherIncome - US_TAX.passive.phaseStart));
+  const passive = i.reps ? Infinity : Math.max(0, US_TAX.passive.allowance - 0.5 * Math.max(0, i.otherIncome - US_TAX.passive.phaseStart));
   const base = baseIncome(i), niitThr = US_TAX.niit[i.fs], sr = i.stateTax / 100;
   const rows = [];
   let bal = loan, susp = 0;
@@ -98,8 +101,9 @@ function ucalc(i, o = {}) {
     // Rental income for tax: NOI less interest less depreciation. Losses are limited by the passive loss rules.
     const dep = D.b[t - 1] + D.s[t - 1], taxable = noi - int - dep;
     let net;
-    if (taxable < 0) { const use = Math.min(-taxable, passive); susp += -taxable - use; net = -use; }
+    if (taxable < 0) { const use = Math.min(-taxable, i.reps ? base : passive); susp += -taxable - use; net = -use; }
     else { const use = Math.min(susp, taxable); susp -= use; net = taxable - use; }
+    if (i.reps && susp > 0) { const extra = Math.min(susp, Math.max(0, base + net)); net -= extra; susp -= extra; } // carried loss used against other income
     const fed = fedTax(Math.max(0, base + net), i.fs) - fedTax(base, i.fs);
     const niit = net > 0 ? 0.038 * Math.min(net, Math.max(0, i.otherIncome + net - niitThr)) : 0;
     const tax = fed + niit + net * sr;
@@ -150,11 +154,12 @@ function uflags(i, c) {
   if (c.dscr < 1.0) add('bad', `DSCR of ${c.dscr.toFixed(2)}: rent does not cover the loan`, 'DSCR is NOI divided by loan payments. Under 1.0 the property does not pay its own mortgage. Many investor and DSCR lenders want 1.2 to 1.25 or more.');
   else if (c.dscr < 1.25) add('warn', `DSCR of ${c.dscr.toFixed(2)} is thin`, 'Many investor and DSCR lenders want 1.2 to 1.25 or more. A small rise in vacancy or costs could take you below 1.0.');
   if (c.cap < i.rate) add('warn', `Negative leverage: cap rate ${c.cap.toFixed(2)}% is below the ${i.rate}% loan rate`, 'The loan costs more than the property earns, so borrowing lowers your cash return. It can still work if rent and price growth make up the gap.');
-  if (i.down < 20) add('warn', `Down payment of ${i.down}% is low for an investment property`, 'Lenders usually want 15 to 25% down on investment properties, and rates are higher than for a home you live in. Private mortgage insurance rules for owner-occupied homes do not apply the same way.');
+  if (i.down < 15) add('warn', `Down payment of ${i.down}% is below what most investment loans allow`, 'Fannie Mae\'s eligibility matrix (checked Nov 2026) allows up to 85% loan-to-value on a one-unit investment property purchase, and 75% on two to four units. Lenders often ask for more, and rates are higher than for a home you live in.');
   if (i.vacancy < 5) add('warn', `Vacancy of ${i.vacancy}% is thin`, 'Even a good rental sits empty between tenants. 5 to 8% is a common allowance.');
   if (i.maint + i.capex < 10) add('warn', `Repairs and reserves are only ${(i.maint + i.capex).toFixed(0)}% of rent`, 'Maintenance plus a reserve for big items (roof, HVAC, water heater) commonly runs 10 to 20% of rent, more for older homes.');
   if (i.mgmt <= 0) add('warn', 'No property management included', 'Even if you self-manage, a fee of 8 to 10% of rent shows what the deal earns if you stop. Add it to see the return without your free labour.');
-  if (c.passive < US_TAX.passive.allowance && c.y1.taxable < 0)
+  if (i.reps) add('info', 'Real estate professional status is switched on', 'Losses are treated as non-passive, so they offset your other income with no $25,000 cap. This only applies if you meet the 750-hour and more-than-half-your-work-time tests and materially participate. Ask a tax adviser.');
+  else if (c.passive < US_TAX.passive.allowance && c.y1.taxable < 0)
     add('warn', `Rental losses are partly blocked by the passive loss rules`, `Your income of ${m(i.otherIncome)} cuts the $25,000 rental loss allowance to ${m(c.passive)}. Losses you cannot use now are carried forward and used against later rental profit or when you sell.`);
   else if (c.y1.taxable < 0) add('info', 'Paper loss from depreciation', `Depreciation of ${m(c.dep)} a year can turn a profit into a tax loss. This calculator assumes you can use up to ${m(c.passive)} of it against other income. Check with a tax professional.`);
   add('info', `Cash needed to close: ${m(c.cash)}`, `Down payment ${m(c.down)}, closing costs ${m(c.closing)} and any repairs. Closing costs here are a rough percentage, so get a Loan Estimate from a lender.`);

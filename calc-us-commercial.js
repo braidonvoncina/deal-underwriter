@@ -39,7 +39,7 @@ function uccalc(i, o = {}) {
   const loan = i.price * i.ltv / 100, closing = i.price * i.closing / 100, cash = i.price - loan + closing;
   const basis = i.price + closing, life = ucLife(i), D = usDep(i, basis, life, N);
   const { rows: sched, pay } = ucSchedule(i, rate, N);
-  const passive = Math.max(0, US_TAX.passive.allowance - 0.5 * Math.max(0, i.otherIncome - US_TAX.passive.phaseStart));
+  const passive = i.reps ? Infinity : Math.max(0, US_TAX.passive.allowance - 0.5 * Math.max(0, i.otherIncome - US_TAX.passive.phaseStart));
   const base = baseIncome(i), niitThr = US_TAX.niit[i.fs], sr = i.stateTax / 100;
   const rows = [];
   let susp = 0;
@@ -47,8 +47,9 @@ function uccalc(i, o = {}) {
     const n = ucNoi(i, t, o), s = sched[t - 1], cf = n.noi - n.capex - s.ds;
     const dep = D.b[t - 1] + D.s[t - 1], taxable = n.noi - s.int - dep;
     let net;
-    if (taxable < 0) { const use = Math.min(-taxable, passive); susp += -taxable - use; net = -use; }
+    if (taxable < 0) { const use = Math.min(-taxable, i.reps ? base : passive); susp += -taxable - use; net = -use; }
     else { const use = Math.min(susp, taxable); susp -= use; net = taxable - use; }
+    if (i.reps && susp > 0) { const extra = Math.min(susp, Math.max(0, base + net)); net -= extra; susp -= extra; } // carried loss used against other income
     const fed = fedTax(Math.max(0, base + net), i.fs) - fedTax(base, i.fs);
     const niit = net > 0 ? 0.038 * Math.min(net, Math.max(0, i.otherIncome + net - niitThr)) : 0;
     const tax = fed + niit + net * sr;
@@ -106,7 +107,8 @@ function ucflags(i, c) {
   if (i.exitCap < c.cap - 0.01) add('warn', `Exit cap rate ${i.exitCap}% is below today's ${c.cap.toFixed(2)}%`, 'This assumes buyers accept a lower yield when you sell, which lifts the sale price. A cautious case sells at the same cap rate or higher.');
   if (c.opexRatio > 55) add('warn', `Running costs take ${c.opexRatio.toFixed(0)}% of income`, 'Costs are high relative to income. Compare each line with the seller\'s operating statements.');
   else if (c.opexRatio < 25 && i.recovery < 50) add('warn', `Running costs are only ${c.opexRatio.toFixed(0)}% of income`, 'That is lean when the owner pays the bills. Check nothing has been left out.');
-  if (c.passive < US_TAX.passive.allowance && c.y1.taxable < 0)
+  if (i.reps) add('info', 'Real estate professional status is switched on', 'Losses are treated as non-passive, so they offset your other income with no $25,000 cap. This only applies if you meet the 750-hour and more-than-half-your-work-time tests and materially participate. Ask a tax adviser.');
+  else if (c.passive < US_TAX.passive.allowance && c.y1.taxable < 0)
     add('warn', 'Rental losses are partly blocked by the passive loss rules', `Your income of ${m(i.otherIncome)} cuts the $25,000 rental loss allowance to ${m(c.passive)}. Unused losses carry forward until you have rental profit or sell.`);
   if (i.ptype !== 'multi') add('info', 'Check the leases, not just the numbers', 'Ask for lease expiry dates, rent steps, who pays taxes, insurance and repairs (NNN or gross), tenant credit and what happens when a big tenant leaves. Depreciation uses 39 years for commercial buildings.');
   else add('info', 'Check the rent roll, condition and local rules', 'For apartments, compare rents with the market, check each unit\'s actual lease and condition, and ask about rent regulation and local code requirements. Depreciation uses 27.5 years.');

@@ -1,9 +1,9 @@
 const U = {
-  state: 'OH', price: 275000, down: 25, rate: 6.75, term: 30, closing: 3, rehab: 0,
-  rent: 2400, vacancy: 5, propTax: 1.4, insurance: 1500, hoa: 0, utilities: 0, maint: 8, capex: 5, mgmt: 8,
+  state: 'OH', price: 275000, down: 25, rate: 7.25, term: 30, closing: 3, rehab: 0,
+  rent: 2400, vacancy: 5, propTax: 1.36, insurance: 1500, hoa: 0, utilities: 0, maint: 8, capex: 5, mgmt: 8,
   appreciation: 3, rentGrowth: 3, expGrowth: 3, hold: 10, sellCost: 6,
-  fs: 'single', otherIncome: 90000, stateTax: 3.5, landPct: 20,
-  costSeg: false, segPct: 25, bonusPct: 100, exchange: false, boot: 0,
+  fs: 'single', otherIncome: 90000, stateTax: 2.75, landPct: 20,
+  reps: false, costSeg: false, segPct: 25, bonusPct: 100, exchange: false, boot: 0,
 };
 ['sum', 'check', 'deals', 'cash', 'adv'].forEach((id) => openSecs.add(id));
 const x2 = (n) => (isFinite(n) ? n.toFixed(2) : 'n/a');
@@ -18,9 +18,9 @@ const TABS = [
   ]],
   ['Loan', [
     ['down', 'Down payment', '%', null, '', 'Investment loans usually need 15 to 25%'],
-    ['rate', 'Interest rate', '%', null, '', 'Check today\'s rate; investor loans cost more'],
+    ['rate', 'Interest rate', '%', null, '', 'Freddie Mac 30-year average was 7.24% on 29 Oct 2026; investor loans cost more'],
     ['term', 'Loan term', 'sel', [[30, '30 years fixed'], [20, '20 years fixed'], [15, '15 years fixed']]],
-    ['closing', 'Closing costs', '%', null, '', 'Of price: lender fees, title, appraisal. Roughly 2 to 4%'],
+    ['closing', 'Closing costs', '%', null, '', 'Of price: lender fees, title, appraisal. Planning guides say 2 to 5%'],
   ]],
   ['Expenses', [
     ['vacancy', 'Vacancy', '%', null, '', 'Share of rent lost to empty months'],
@@ -39,8 +39,9 @@ const TABS = [
   ['Tax', [
     ['fs', 'Filing status', 'sel', [['single', 'Single'], ['mfj', 'Married filing jointly']]],
     ['otherIncome', 'Your other income /yr', '$', null, '', 'Wages and other income, before deductions'],
-    ['stateTax', 'State income tax', '%', null, '', 'Rough rate on the income'],
+    ['stateTax', 'State income tax', '%', null, '', 'Your marginal rate. Defaults are flat rates or mid-bracket guesses'],
     ['landPct', 'Share that is land', '%', null, '', 'Land is not depreciated. Use the county assessor split'],
+    ['reps', 'Real estate professional', 'sel', [['0', 'No'], ['1', 'Yes']], '', 'Only if you work 750+ hours a year in real estate and more than half your working time. Removes the rental loss cap'],
     ['costSeg', 'Cost segregation study', 'sel', [['0', 'Off'], ['1', 'On']], '', 'Splits the building into short-life parts for faster deductions'],
     ['segPct', 'Share reclassified as short-life', '%', null, '', 'Often 15 to 30% of the building'],
     ['bonusPct', 'Bonus depreciation', '%', null, '', 'Share of short-life parts deducted in year 1'],
@@ -120,7 +121,7 @@ function render() {
   s.push(sec('tax', 'Tax: depreciation and passive losses', `
     <div class="two">
       <div class="col"><h4>Year 1</h4>${row('NOI', $(y.noi))}${row('Less loan interest', $(-y.int))}${row('Less depreciation', $(-c.dep))}${row('<b>Taxable rental income</b>', $(y.taxable), cls(y.taxable))}${row('Tax effect (negative is a saving)', $(y.tax))}</div>
-      <div class="col"><h4>Your position</h4>${row('Federal bracket on top of other income', pc(c.marginal * 100, 0))}${row('Rental loss you can use', $(c.passive))}${row('Yearly depreciation', $(c.dep))}${row(`Unused losses carried at year ${N}`, $(c.last.susp))}</div>
+      <div class="col"><h4>Your position</h4>${row('Federal bracket on top of other income', pc(c.marginal * 100, 0))}${row('Rental loss you can use', isFinite(c.passive) ? $(c.passive) : 'No limit')}${row('Yearly depreciation', $(c.dep))}${row(`Unused losses carried at year ${N}`, $(c.last.susp))}</div>
     </div>
     ${learn(`<p>Residential rentals are depreciated over 27.5 years (straight line): <code>(price + closing costs + repairs - land) / 27.5</code> a year. It is a deduction on paper only, so taxable income can be negative while cash flow is positive. This calculator takes a full year of depreciation in year 1; the real first year is prorated by the month placed in service.</p>
       <p>Rental losses are "passive". A rule lets landlords who actively manage deduct up to $25,000 against other income, cut by 50 cents for each dollar of income over $100,000, to zero at $150,000. Losses you cannot use are carried forward and used against later rental profit or released when you sell. This shortcut treats your income entered as your adjusted gross income and ignores other limits such as the 20% pass-through deduction.</p>`)}`));

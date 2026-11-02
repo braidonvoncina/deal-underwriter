@@ -2,7 +2,8 @@
 const RENT_X = { w: 52, m: 12, y: 1 };
 const annualRent = (i) => i.roll.reduce((a, r) => a + r.count * r.rent * RENT_X[i.rentBasis], 0);
 const unitCount = (i) => i.roll.reduce((a, r) => a + r.count, 0);
-const cgtDiscount = (tax) => (tax === 15 ? 1 / 3 : tax === 25 || tax === 30 ? 0 : 0.5);
+// Owner decides the discount: individuals 50%, complying super funds one third, companies none. Older saved deals had no owner, so guess from the rate.
+const cgtDiscount = (i) => { const o = i.owner || (i.tax === 15 ? 'smsf' : i.tax === 25 ? 'co' : 'ind'); return o === 'smsf' ? 1 / 3 : o === 'co' ? 0 : 0.5; };
 
 // Interest-only for the first ioYears, then principal and interest over the rest of the term.
 function loanSchedule(i, rate, years) {
@@ -55,7 +56,7 @@ function ccalc(i, o = {}) {
   }
   const y1 = rows[0], fwd = noiYear(i, N + 1, o).noi, sale = fwd / (exitCap / 100), costs = sale * i.sellCost / 100, bal = rows[N - 1].bal;
   const cwTotal = dp.rows.slice(0, N).reduce((a, r) => a + r.cw, 0);
-  const gain = Math.max(0, sale - costs - (i.price + duty + i.acq - cwTotal)), disc = cgtDiscount(i.tax);
+  const gain = Math.max(0, sale - costs - (i.price + duty + i.acq - cwTotal)), disc = cgtDiscount(i);
   const cgt = gain * (1 - disc) * i.tax / 100, net = sale - costs - bal - cgt;
   const flows = [-equity, ...rows.map((r) => r.cfAfter)];
   flows[N] += net;

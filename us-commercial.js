@@ -2,11 +2,11 @@ const K = {
   state: 'OH', ptype: 'multi', price: 2100000, landPct: 20, area: 0,
   roll: [{ name: '1-bed units', count: 6, rent: 1350 }, { name: '2-bed units', count: 6, rent: 1600 }], rentBasis: 'm',
   extraIncome: 6000, vacancy: 5, creditLoss: 1, recovery: 0,
-  propTax: 1.2, insurance: 12000, repairs: 14000, otherOpex: 10000, mgmt: 5, capex: 3, closing: 2,
-  ltv: 65, rate: 6.75, amort: 30, ioYears: 0,
+  propTax: 1.36, insurance: 12000, repairs: 14000, otherOpex: 10000, mgmt: 5, capex: 3, closing: 2,
+  ltv: 65, rate: 7.25, amort: 30, ioYears: 0,
   hold: 7, rentGrowth: 3, expGrowth: 3, exitCap: 6.75, sellCost: 3,
-  fs: 'single', otherIncome: 90000, stateTax: 3.5,
-  costSeg: false, segPct: 25, bonusPct: 100, exchange: false, boot: 0,
+  fs: 'single', otherIncome: 90000, stateTax: 2.75,
+  reps: false, costSeg: false, segPct: 25, bonusPct: 100, exchange: false, boot: 0,
 };
 ['sum', 'check', 'deals', 'noi', 'debt', 'adv'].forEach((id) => openSecs.add(id));
 const TYPES = { multi: 'Multifamily', retail: 'Retail', office: 'Office', industrial: 'Industrial', mixed: 'Mixed use' };
@@ -47,7 +47,7 @@ const TABS = [
   ]],
   ['Financing', [
     ['ltv', 'Loan to value (LTV)', '%', null, '', 'Commercial lenders often cap this at 65 to 75%'],
-    ['rate', 'Interest rate', '%', null, '', 'Check today\'s quotes'],
+    ['rate', 'Interest rate', '%', null, '', 'Start point is the Freddie Mac 30-year home loan average, 7.24% on 29 Oct 2026. Get commercial quotes'],
     ['amort', 'Amortization', 'sel', [[30, '30 years'], [25, '25 years'], [20, '20 years']], '', 'Years the payment is based on'],
     ['ioYears', 'Interest-only period', 'yrs'],
   ]],
@@ -60,7 +60,8 @@ const TABS = [
   ['Tax', [
     ['fs', 'Filing status', 'sel', [['single', 'Single'], ['mfj', 'Married filing jointly']]],
     ['otherIncome', 'Your other income /yr', '$', null, '', 'Wages and other income, before deductions'],
-    ['stateTax', 'State income tax', '%', null, '', 'Rough flat rate'],
+    ['stateTax', 'State income tax', '%', null, '', 'Your marginal rate. Defaults are flat rates or mid-bracket guesses'],
+    ['reps', 'Real estate professional', 'sel', [['0', 'No'], ['1', 'Yes']], '', 'Only if you work 750+ hours a year in real estate and more than half your working time. Removes the rental loss cap'],
     ['costSeg', 'Cost segregation study', 'sel', [['0', 'Off'], ['1', 'On']], '', 'Splits the building into short-life parts for faster deductions'],
     ['segPct', 'Share reclassified as short-life', '%', null, '', 'Often 15 to 30% of the building'],
     ['bonusPct', 'Bonus depreciation', '%', null, '', 'Share of short-life parts deducted in year 1'],
@@ -200,7 +201,7 @@ function render() {
   s.push(sec('tax', 'Tax and depreciation', `
     <div class="two">
       <div class="col"><h4>Year 1</h4>${row('NOI', $(y.noi))}${row('Less loan interest', $(-y.int))}${row(`Less depreciation (${c.life} yrs)`, $(-c.dep))}${row('<b>Taxable income</b>', $(y.taxable), cls(y.taxable))}${row('Tax effect (negative is a saving)', $(y.tax))}</div>
-      <div class="col"><h4>Your position</h4>${row('Federal bracket', pc(c.marginal * 100, 0))}${row('Rental loss you can use', $(c.passive))}${row(`Unused losses at year ${N}`, $(c.last.susp))}</div>
+      <div class="col"><h4>Your position</h4>${row('Federal bracket', pc(c.marginal * 100, 0))}${row('Rental loss you can use', isFinite(c.passive) ? $(c.passive) : 'No limit')}${row(`Unused losses at year ${N}`, $(c.last.susp))}</div>
     </div>
     ${learn(`<p>Apartment buildings depreciate over 27.5 years and commercial buildings over 39, straight line, a deduction on paper only. Depreciation is taken back at sale (see below). Cost segregation and bonus depreciation can speed deductions up but are not modelled here.</p>
       <p>Rental losses are "passive". A $25,000 allowance for active owners is cut by 50 cents per dollar of income over $100,000. This calculator treats your income as your adjusted gross income, and ignores the 20% pass-through deduction and real estate professional status.</p>`)}`));

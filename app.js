@@ -1,4 +1,4 @@
-const S = { state: 'VIC', price: 500000, invest: true, deposit: 50000, pct: 10, rate: 6, term: 30, ioYears: 5,
+const S = { state: 'VIC', price: 500000, landValue: 250000, invest: true, deposit: 50000, pct: 10, rate: 6, term: 30, ioYears: 5,
   weekly: 481, growth: 6, infl: 2.5, council: 2500, insurance: 1200, maintenance: 500, other: 500, acq: 2000,
   tax: 37, construction: 300000, pne: 50000, method: 'dv', extra: 0, extraFreq: 'w' };
 const sens = { rate: 0, growth: 0, vacancy: false, exp: false };
@@ -8,6 +8,7 @@ const TABS = [
   ['Property', [
     ['state', 'State / territory', 'sel', ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'].map((s) => [s, s])],
     ['price', 'Purchase price', '$'],
+    ['landValue', 'Land value', '$', null, '', 'Used for land tax. Find it on the state valuation or council notice'],
     ['invest', 'Property type', 'sel', [['1', 'Investment property'], ['0', 'Owner occupier']], 'full'],
   ]],
   ['Financing', [
@@ -26,7 +27,7 @@ const TABS = [
     ['acq', 'One-time acquisition costs', '$', null, 'full', 'Legal fees, inspections, bank fees.'],
   ]],
   ['Tax', [
-    ['tax', 'Income tax bracket', 'sel', [['0', 'Tax-free (0%)'], ['19', '$18,201 to $45,000 (19%)'], ['32.5', '$45,001 to $120,000 (32.5%)'], ['37', '$120,001 to $180,000 (37%)'], ['45', '$180,001+ (45%)']], 'full'],
+    ['tax', 'Income tax bracket', 'sel', [['0', 'Tax-free (0%)'], ['15', '$18,201 to $45,000 (15%)'], ['30', '$45,001 to $135,000 (30%)'], ['37', '$135,001 to $190,000 (37%)'], ['45', '$190,001+ (45%)']], 'full'],
     ['construction', 'Construction value', '$', null, '', 'Auto: 60% of price'],
     ['pne', 'Plant & equipment', '$', null, '', 'Auto: 10% of price'],
     ['method', 'Depreciation method', 'sel', [['dv', 'Diminishing value'], ['pc', 'Prime cost']], 'full'],
@@ -42,6 +43,7 @@ const form = createForm(TABS, S, {
   onField: (k, touched) => {
     if (k === 'price') {
       S.deposit = S.price * S.pct / 100;
+      if (!touched.has('landValue')) S.landValue = S.price * 0.5;
       if (!touched.has('construction')) S.construction = S.price * 0.6;
       if (!touched.has('pne')) S.pne = S.price * 0.1;
     }
@@ -58,7 +60,7 @@ const deals = createDeals({
   key: 'deals-v1', resultsEl: document.getElementById('results'), rerender: () => render(),
   defaultName: () => `${S.state} ${$(S.price)}`,
   snapshot: () => S,
-  restore: (inp) => { Object.assign(S, inp); form.touched.add('construction'); form.touched.add('pne'); form.sync(); },
+  restore: (inp) => { Object.assign(S, inp); if (inp.landValue == null) S.landValue = S.price * 0.5; S.tax = { 19: 15, 32.5: 30 }[S.tax] ?? S.tax; form.touched.add('construction'); form.touched.add('pne'); form.sync(); },
   view: (i) => {
     const c = calc(i);
     return { subtitle: `${i.state} · ${$(i.price)} · ${i.invest ? 'Investment' : 'Owner occupier'}`,
@@ -115,7 +117,7 @@ function render() {
       ${kpi('Land tax', $(c.lt), 'Per year, ' + (S.invest ? 'investor rates' : 'not charged on a home'))}
       ${kpi('Upfront tax cost', $(c.duty + c.lt), 'Duty + first year land tax')}
     </div>
-    ${learn(`<p>Duty is a state-by-state sliding scale on the price. Land tax here is applied to the purchase price, a simplification: real land tax uses the unimproved land value, so it is usually lower. Surcharges, concessions and trust or foreign-buyer rules are not included.</p>`)}`));
+    ${learn(`<p>Duty is a state-by-state sliding scale on the price. Land tax uses the land value you enter and each state's current scale for individuals, but real land tax adds up all your land in that state and can differ for trusts, companies and foreign owners. Surcharges, concessions and first-home rules are not included. Rates checked against state revenue office sources in November 2026; the Medicare levy is not included in the tax bracket.</p>`)}`));
 
   sections.push(sec('fin', 'Annual financial summary', `
     <div class="two">

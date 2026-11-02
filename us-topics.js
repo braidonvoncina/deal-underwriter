@@ -2,7 +2,7 @@
 function usTopics() {
   const t = (title, body) => `<details class="learn"><summary>${title}</summary>${body}</details>`;
   return sec('topics', 'Tax topics to learn', `
-    <p class="note">General education, not tax advice. The first two topics are modelled in the Tax tab; the last two are not, so read them before you rely on the after-tax numbers.</p>
+    <p class="note">General education, not tax advice. The first two topics and the real estate professional switch are modelled in the Tax tab. The 20% pass-through deduction is not, so read it before you rely on the after-tax numbers.</p>
     ${t('1031 exchange (modelled)', `
       <p>Section 1031 lets you swap real property held for business or investment for like-kind real property without recognising the gain at that time. It does not apply to property held mainly for sale, and US and foreign property are not like kind.</p>
       <p>Timing is strict: you must identify the replacement within <b>45 days</b> of transferring the old property and receive it within <b>180 days</b> (or by your tax return due date if earlier).</p>
@@ -17,8 +17,8 @@ function usTopics() {
       <p>Section 199A allows individuals a deduction equal to the lesser of the "combined qualified business income amount" or 20% of taxable income over net capital gain. It only applies to income from a <b>trade or business</b>. Whether a rental qualifies depends on the facts, such as how active and regular your involvement is, so a single rental often needs professional advice.</p>
       <p>Above certain income levels, limits based on wages paid and the cost of the property apply. The Cornell Law statute page I read showed the old end-of-2025 expiry removed by Public Law 119-21, but confirm the current rules and thresholds before relying on it.</p>
       <p>Why it is not in the calculator: it needs facts the calculator does not know (trade or business status, wages, other business income) and a wrong switch would overstate your return.</p>`)}
-    ${t('Real estate professional status (not modelled)', `
+    ${t('Real estate professional status (switch in the Tax tab)', `
       <p>Rental activity is normally "passive", so losses are limited as shown on the Tax tab. Under section 469(c)(7), rental real estate is not automatically passive if, in the year, more than half of your personal services in all trades or businesses are in real property trades or businesses in which you materially participate, <b>and</b> you perform more than <b>750 hours</b> there.</p>
       <p>You must still materially participate in the rental activity itself. Real property businesses include development, construction, acquisition, rental, operation, management, leasing and brokerage. Records of your hours matter, and this status draws scrutiny, particularly for people with a full-time job elsewhere.</p>
-      <p>If it applies, losses, including those from cost segregation, can offset other income without the $25,000 cap. That is why cost segregation often pays off for real estate professionals and much less for other investors. Ask a tax adviser before assuming it.</p>`)}`);
+      <p>If it applies, losses, including those from cost segregation, can offset other income without the $25,000 cap. The calculator's switch removes that cap when you say yes; it cannot check that you qualify. That is why cost segregation often pays off for real estate professionals and much less for other investors. Ask a tax adviser before assuming it.</p>`)}`);
 }

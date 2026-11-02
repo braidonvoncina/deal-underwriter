@@ -1,24 +1,28 @@
 // Calculation engine. Formulas recovered from the original app's bundle (see notes in index.html "How it works").
 const STEP = { // [threshold, base, % per $100 above threshold]
-  NSW: [[0,0,1.25],[17e3,212,1.5],[37e3,512,1.75],[99e3,1597,3.5],[372e3,11152,4.5],[1240e3,50212,5.5]],
+  NSW: [[0,0,1.25],[18e3,225,1.5],[38e3,525,1.75],[103e3,1662,3.5],[387e3,11602,4.5],[1290e3,52237,5.5]], // 2026/27, indexed each 1 July
+  ACT: [[0,0,1.2],[200e3,2400,2.2],[300e3,4600,3.4],[500e3,11400,4.32],[750e3,22200,5.9],[1000e3,36950,6.4]], // non-owner-occupier; flat 4.54% of the total above $1,455,000
   QLD: [[0,0,0],[5e3,0,1.5],[75e3,1050,3.5],[540e3,17325,4.5],[1e6,38025,5.75]],
   TAS: [[0,50,0],[3e3,50,1.75],[25e3,435,2.25],[75e3,1560,3.5],[200e3,5935,4],[375e3,12935,4.25],[725e3,27810,4.5]],
   WA:  [[0,0,1.9],[120e3,2280,2.85],[150e3,3135,3.8],[360e3,11115,4.75],[725e3,28453,5.15]],
 };
 const MARGINAL = { // [from, %] marginal duty
   SA:  [[0,1],[12e3,2],[30e3,3],[50e3,3.5],[100e3,4],[200e3,4.25],[250e3,4.75],[300e3,5],[500e3,5.5]],
-  ACT: [[0,2.2],[200e3,4.5]],
-  NT:  [[0,4.95],[525e3,5.45]],
 };
-const LAND_TAX = { // [from, %] marginal, applied to purchase price as the original does
-  NSW: [[0,0],[822e3,1.6],[3357e3,2]],
-  VIC: [[0,0],[300e3,0.2],[600e3,0.3],[1e6,0.25]],
-  QLD: [[0,0],[350e3,1],[2250e3,1.75]],
-  WA:  [[0,0],[300e3,0.25]],
-  SA:  [[0,0],[25e3,0.5]],
-  TAS: [[0,0],[25e3,0.55]],
-  ACT: [[0,0.634]],
+const LAND_TAX = { // [from, base $, % above from] on land value. Individuals, investment property.
+  NSW: [[0,0,0],[1075e3,100,1.6],[6571e3,88036,2]],
+  VIC: [[0,0,0],[50e3,500,0],[100e3,975,0],[300e3,1350,0.3],[600e3,2250,0.6],[1e6,4650,0.9],[1.8e6,11850,1.65],[3e6,31650,2.65]],
+  QLD: [[0,0,0],[600e3,500,1],[1e6,4500,1.65],[3e6,37500,1.25],[5e6,62500,1.75],[10e6,150000,2.25]],
+  WA:  [[0,0,0],[300e3,300,0],[420e3,300,0.25],[1e6,1750,0.9],[1.8e6,8950,1.8],[5e6,66550,2],[11e6,186550,2.67]],
+  SA:  [[0,0,0],[936e3,0,0.5],[1504e3,2840,1.65],[2188e3,14126,2.4]], // 2026-27 thresholds; rates above the first band are approximate
+  TAS: [[0,0,0],[125e3,50,0.45],[500e3,1737.5,1.5]],
+  ACT: [[0,1778,0.54],[150e3,2588,0.64],[275e3,3388,1.24],[1e6,12378,1.25],[2e6,24878,1.26]], // fixed charge + valuation charge
   NT:  [],
+};
+const bandTax = (v, t) => {
+  let row = null;
+  for (const r of t) if (v > r[0] || (!row && v >= r[0])) row = r;
+  return row ? row[1] + (v - row[0]) * row[2] / 100 : 0;
 };
 const marginal = (p, t) => t.reduce((d, [f, r], i) => {
   const to = i + 1 < t.length ? t[i + 1][0] : Infinity;
@@ -33,6 +37,11 @@ function stampDuty(p, st) {
     if (p <= 2e6) return p * 0.055;
     return 110e3 + (p - 2e6) * 0.065;
   }
+  if (st === 'ACT' && p > 1455e3) return p * 0.0454;
+  if (st === 'NT') {
+    if (p <= 525e3) { const v = p / 1000; return 0.06571441 * v * v + 15 * v; }
+    return p * (p < 3e6 ? 0.0495 : p < 5e6 ? 0.0575 : 0.0595);
+  }
   if (STEP[st]) {
     let row = STEP[st][0];
     for (const r of STEP[st]) if (p > r[0]) row = r;
@@ -40,7 +49,7 @@ function stampDuty(p, st) {
   }
   return marginal(p, MARGINAL[st]);
 }
-const landTax = (p, st, invest) => (invest ? marginal(p, LAND_TAX[st]) : 0);
+const landTax = (v, st, invest) => (invest && v > 0 ? bandTax(v, LAND_TAX[st]) : 0);
 
 const pmt = (P, rate, yrs) => {
   if (P <= 0 || rate < 0 || yrs <= 0) return 0;
@@ -131,7 +140,7 @@ function calc(i) {
   const loan = i.price - i.deposit, exp = i.council + i.insurance + i.maintenance + i.other;
   const rent = i.weekly * 52, monthly = pmt(loan, i.rate, i.term), annualLoan = monthly * 12;
   const dp = depreciation(i);
-  const duty = stampDuty(i.price, i.state), lt = landTax(i.price, i.state, i.invest);
+  const duty = stampDuty(i.price, i.state), lt = landTax(i.landValue ?? i.price * 0.5, i.state, i.invest);
   const invested = i.deposit + i.acq;
   const cf = afterTax(rent, exp, annualLoan, i, dp.y1save);
   const ng = Math.max(0, -(rent - exp - annualLoan)) * (i.invest ? i.tax / 100 : 0);
