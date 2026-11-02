@@ -1,46 +1,14 @@
 const S = { state: 'VIC', price: 500000, invest: true, deposit: 50000, pct: 10, rate: 6, term: 30, ioYears: 5,
   weekly: 481, growth: 6, infl: 2.5, council: 2500, insurance: 1200, maintenance: 500, other: 500, acq: 2000,
   tax: 37, construction: 300000, pne: 50000, method: 'dv', extra: 0, extraFreq: 'w' };
-const touched = new Set();
 const sens = { rate: 0, growth: 0, vacancy: false, exp: false };
-const openSecs = new Set(['sum', 'check', 'deals', 'out', 'fin', 'loan']);
+['sum', 'check', 'deals', 'out', 'fin', 'loan'].forEach((id) => openSecs.add(id));
 
-const DEALS_KEY = 'deals-v1', MAX_DEALS = 6;
-const LVL = { bad: 'Risk', warn: 'Watch', ok: 'Good', info: 'Note' };
-const ORDER = { bad: 0, warn: 1, ok: 2, info: 3 };
-let deals = [], saveName = '', dealMsg = '', persisted = true;
-loadDeals();
-
-const esc = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-function loadDeals() { try { deals = JSON.parse(localStorage.getItem(DEALS_KEY)) || []; } catch (e) { deals = []; } }
-function persistDeals() { try { localStorage.setItem(DEALS_KEY, JSON.stringify(deals)); persisted = true; } catch (e) { persisted = false; } }
-const byLevel = (a, b) => ORDER[a.lvl] - ORDER[b.lvl];
-
-function dealCard(d, c, best, multi) {
-  const tag = (on) => (on && multi ? '<span class="best">Best</span>' : '');
-  const f = flags(d.inputs, c).sort(byLevel).slice(0, 3);
-  return `<article class="deal"><div><h4>${esc(d.name)}</h4><p class="note">${d.inputs.state} · ${$(d.inputs.price)} · ${d.inputs.invest ? 'Investment' : 'Owner occupier'}</p></div>
-    <div>${row('Cash flow / wk', $(c.cf / 52) + tag(c.cf === best.cf), cls(c.cf))}${row('Net yield', pc(c.netYield) + tag(c.netYield === best.y))}${row('LVR', pc(c.lvr, 1))}${row('Weekly rent', $(d.inputs.weekly))}${row('Cash to settle', $(d.inputs.deposit + d.inputs.acq + c.duty))}${row('10 yr total return', $(c.totalReturn), cls(c.totalReturn))}</div>
-    <ul class="chips">${f.map((x) => `<li class="chip f-${x.lvl}"><span class="tag">${LVL[x.lvl]}</span>${esc(x.head)}</li>`).join('')}</ul>
-    <div><label class="note" for="n-${d.id}">Notes</label><textarea id="n-${d.id}" data-notes="${d.id}" rows="3" placeholder="Why it works, what to check, who to call">${esc(d.notes)}</textarea></div>
-    <div class="btns"><button class="btn pri" type="button" data-load="${d.id}">Load</button><button class="btn" type="button" data-del="${d.id}">Delete</button></div></article>`;
-}
-
-function dealsBody() {
-  const calcs = deals.map((d) => ({ d, c: calc(d.inputs) }));
-  const best = { cf: Math.max(...calcs.map((x) => x.c.cf)), y: Math.max(...calcs.map((x) => x.c.netYield)) };
-  return `<div class="savebar"><input id="deal-name" value="${esc(saveName)}" placeholder="${esc(S.state + ' ' + $(S.price))}" aria-label="Deal name" autocomplete="off"><button class="btn pri" type="button" data-save>Save this deal</button></div>
-    <p class="note" role="status">${esc(dealMsg) || (persisted ? 'Deals are saved on this device only.' : 'Storage is blocked in this browser, so deals last until you close the page.')}</p>
-    ${calcs.length ? `<div class="deals">${calcs.map((x) => dealCard(x.d, x.c, best, calcs.length > 1)).join('')}</div>`
-      : '<p class="note">No saved deals yet. Enter a property, give it a name and tap Save. Saved deals sit side by side here so you can compare them.</p>'}`;
-}
-
-const opts = (a) => a.map(([v, t]) => ({ v, t }));
 const TABS = [
   ['Property', [
-    ['state', 'State / territory', 'sel', opts(['NSW','VIC','QLD','WA','SA','TAS','ACT','NT'].map((s) => [s, s]))],
+    ['state', 'State / territory', 'sel', ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'].map((s) => [s, s])],
     ['price', 'Purchase price', '$'],
-    ['invest', 'Property type', 'sel', opts([['1', 'Investment property'], ['0', 'Owner occupier']]), 'full'],
+    ['invest', 'Property type', 'sel', [['1', 'Investment property'], ['0', 'Owner occupier']], 'full'],
   ]],
   ['Financing', [
     ['deposit', 'Deposit', '$'], ['pct', 'Deposit %', '%'],
@@ -48,9 +16,9 @@ const TABS = [
     ['ioYears', 'Interest-only period', 'yrs', null, 'full', 'Used in the P&I vs interest-only comparison.'],
   ]],
   ['Income', [
-    ['weekly', 'Weekly rent', '$', null, '', 'rentNote'],
+    ['weekly', 'Weekly rent', '$', null, '', ''],
     ['infl', 'Inflation', '%'],
-    ['growth', 'Capital growth', 'sel', opts([['4', 'Conservative 4% p.a.'], ['6', 'Moderate 6% p.a.'], ['8', 'Optimistic 8% p.a.']]), 'full'],
+    ['growth', 'Capital growth', 'sel', [['4', 'Conservative 4% p.a.'], ['6', 'Moderate 6% p.a.'], ['8', 'Optimistic 8% p.a.']], 'full'],
   ]],
   ['Expenses', [
     ['council', 'Council rates /yr', '$'], ['insurance', 'Insurance /yr', '$'],
@@ -58,75 +26,20 @@ const TABS = [
     ['acq', 'One-time acquisition costs', '$', null, 'full', 'Legal fees, inspections, bank fees.'],
   ]],
   ['Tax', [
-    ['tax', 'Income tax bracket', 'sel', opts([['0', 'Tax-free (0%)'], ['19', '$18,201 to $45,000 (19%)'], ['32.5', '$45,001 to $120,000 (32.5%)'], ['37', '$120,001 to $180,000 (37%)'], ['45', '$180,001+ (45%)']]), 'full'],
+    ['tax', 'Income tax bracket', 'sel', [['0', 'Tax-free (0%)'], ['19', '$18,201 to $45,000 (19%)'], ['32.5', '$45,001 to $120,000 (32.5%)'], ['37', '$120,001 to $180,000 (37%)'], ['45', '$180,001+ (45%)']], 'full'],
     ['construction', 'Construction value', '$', null, '', 'Auto: 60% of price'],
     ['pne', 'Plant & equipment', '$', null, '', 'Auto: 10% of price'],
-    ['method', 'Depreciation method', 'sel', opts([['dv', 'Diminishing value'], ['pc', 'Prime cost']]), 'full'],
+    ['method', 'Depreciation method', 'sel', [['dv', 'Diminishing value'], ['pc', 'Prime cost']], 'full'],
   ]],
   ['Extra', [
     ['extra', 'Extra repayment', '$'],
-    ['extraFreq', 'Frequency', 'sel', opts([['w', 'Weekly'], ['f', 'Fortnightly'], ['m', 'Monthly']])],
+    ['extraFreq', 'Frequency', 'sel', [['w', 'Weekly'], ['f', 'Fortnightly'], ['m', 'Monthly']]],
   ]],
 ];
 
-const $ = (n, signed) => {
-  const s = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 }).format(Math.abs(Math.round(n)));
-  return n < -0.5 ? '-' + s : signed && n > 0.5 ? '+' + s : s;
-};
-const pc = (n, d = 2) => n.toFixed(d) + '%';
-const cls = (n) => (n < -0.5 ? 'neg' : n > 0.5 ? 'pos' : '');
-const row = (l, v, c = '') => `<div class="row"><span>${l}</span><b class="${c}">${v}</b></div>`;
-const kpi = (l, v, sub, c = '') => `<div class="k"><span>${l}</span><b class="${c}">${v}</b><em>${sub}</em></div>`;
-const learn = (t) => `<details class="learn"><summary>How this is worked out</summary>${t}</details>`;
-const sec = (id, title, body) => `<details class="card sec" data-id="${id}"${openSecs.has(id) ? ' open' : ''}><summary>${title}</summary><div class="body">${body}</div></details>`;
-
-function buildInputs() {
-  document.getElementById('tabs').innerHTML = TABS.map((t, i) =>
-    `<button class="tab" role="tab" id="tab${i}" aria-selected="${i === 0}" aria-controls="p${i}" data-i="${i}"><i>${i + 1}</i>${t[0]}</button>`).join('');
-  document.getElementById('panels').innerHTML = TABS.map((t, i) =>
-    `<div class="panel" role="tabpanel" id="p${i}" aria-labelledby="tab${i}"${i ? ' hidden' : ''}>${t[1].map(([k, label, unit, o, w, hint]) => {
-      const full = w === 'full' ? ' full' : '';
-      const ctl = unit === 'sel'
-        ? `<div class="box"><select id="in-${k}" data-k="${k}">${o.map((x) => `<option value="${x.v}">${x.t}</option>`).join('')}</select></div>`
-        : `<div class="box">${unit === '$' ? '<span>$</span>' : ''}<input id="in-${k}" data-k="${k}" type="text" inputmode="decimal" autocomplete="off">${unit !== '$' ? `<span>${unit}</span>` : ''}</div>`;
-      return `<div class="f${full}"><label for="in-${k}">${label}</label>${ctl}${hint ? `<small id="h-${k}">${hint === 'rentNote' ? '' : hint}</small>` : ''}</div>`;
-    }).join('')}</div>`).join('');
-  syncInputs();
-}
-
-function syncInputs(except) {
-  document.querySelectorAll('[data-k]').forEach((el) => {
-    if (el.id === except) return;
-    const v = S[el.dataset.k];
-    el.value = typeof v === 'boolean' ? (v ? '1' : '0') : (el.tagName === 'INPUT' ? withCommas(String(Math.round(v * 100) / 100)) : v);
-  });
-  const note = document.getElementById('h-weekly');
-  if (note) note.textContent = '= ' + $(S.weekly * 52 / 12) + ' per month, ' + $(S.weekly * 52) + ' per year';
-}
-
-const withCommas = (s) => {
-  const [i, d] = s.split('.');
-  const n = i.replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return d === undefined ? n : n + '.' + d.slice(0, 3);
-};
-
-function onInput(e) {
-  const el = e.target, k = el.dataset.k;
-  if (!k) return;
-  let v = el.value;
-  if (el.tagName === 'INPUT') {
-    const digitsBeforeCaret = el.value.slice(0, el.selectionStart).replace(/[^\d.]/g, '').length;
-    v = el.value.replace(/[^\d.]/g, '').replace(/^(\d*\.\d*)\./, '$1');
-    el.value = withCommas(v);
-    let p = 0, seen = 0;
-    while (p < el.value.length && seen < digitsBeforeCaret) { if (/[\d.]/.test(el.value[p])) seen++; p++; }
-    el.setSelectionRange(p, p);
-  }
-  if (k === 'state' || k === 'method' || k === 'extraFreq') S[k] = v;
-  else if (k === 'invest') S.invest = v === '1';
-  else {
-    S[k] = parseFloat(v) || 0;
-    touched.add(k);
+const form = createForm(TABS, S, {
+  onChange: () => render(),
+  onField: (k, touched) => {
     if (k === 'price') {
       S.deposit = S.price * S.pct / 100;
       if (!touched.has('construction')) S.construction = S.price * 0.6;
@@ -134,10 +47,26 @@ function onInput(e) {
     }
     if (k === 'deposit') S.pct = S.price ? S.deposit / S.price * 100 : 0;
     if (k === 'pct') S.deposit = S.price * S.pct / 100;
-  }
-  syncInputs(el.id);
-  render();
-}
+  },
+  afterSync: () => {
+    const n = document.getElementById('h-weekly');
+    if (n) n.textContent = '= ' + $(S.weekly * 52 / 12) + ' per month, ' + $(S.weekly * 52) + ' per year';
+  },
+});
+
+const deals = createDeals({
+  key: 'deals-v1', resultsEl: document.getElementById('results'), rerender: () => render(),
+  defaultName: () => `${S.state} ${$(S.price)}`,
+  snapshot: () => S,
+  restore: (inp) => { Object.assign(S, inp); form.touched.add('construction'); form.touched.add('pne'); form.sync(); },
+  view: (i) => {
+    const c = calc(i);
+    return { subtitle: `${i.state} · ${$(i.price)} · ${i.invest ? 'Investment' : 'Owner occupier'}`,
+      rows: [['Cash flow / wk', $(c.cf / 52), cls(c.cf), c.cf], ['Net yield', pc(c.netYield), '', c.netYield], ['LVR', pc(c.lvr, 1)],
+        ['Weekly rent', $(i.weekly)], ['Cash to settle', $(i.deposit + i.acq + c.duty)], ['10 yr total return', $(c.totalReturn), cls(c.totalReturn)]],
+      flags: flags(i, c) };
+  },
+});
 
 function chart(series) {
   const W = 640, H = 250, L = 56, R = 12, T = 12, B = 28, n = series.length - 1;
@@ -169,10 +98,8 @@ function render() {
       <p><code>Weekly cash flow = (rent - costs - loan repayments + tax benefits) / 52</code>. Tax benefits are depreciation savings plus the refund on the cash loss.</p>
       <p><code>LVR = loan / price</code>. Above 80% most lenders add mortgage insurance.</p>`)}`));
 
-  const fl = flags(S, c).sort(byLevel);
-  sections.push(sec('check', 'Deal check', `<div class="flags">${fl.map((f) => `<div class="flag f-${f.lvl}"><b><span class="tag">${LVL[f.lvl]}</span>${esc(f.head)}</b><p>${esc(f.why)}</p></div>`).join('')}</div>
-    <p class="note">Rules of thumb to question a deal with. They are prompts to dig deeper, not a verdict.</p>`));
-  sections.push(sec('deals', 'Saved deals', dealsBody()));
+  sections.push(sec('check', 'Deal check', flagList(flags(S, c))));
+  sections.push(sec('deals', 'Saved deals', deals.body()));
 
   sections.push(sec('out', '10 year outlook', `
     <div class="kpis">
@@ -276,20 +203,9 @@ function render() {
     `<div><span>Cash flow / wk</span><b class="${cls(wk)}">${$(wk)}</b></div><div><span>Net yield</span><b>${pc(c.netYield)}</b></div><div><span>LVR</span><b>${pc(c.lvr, 1)}</b></div>`;
 }
 
-buildInputs();
 render();
-document.getElementById('panels').addEventListener('input', onInput);
-document.getElementById('tabs').addEventListener('click', (e) => {
-  const b = e.target.closest('.tab');
-  if (!b) return;
-  document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', t === b));
-  document.querySelectorAll('.panel').forEach((p, i) => { p.hidden = i !== +b.dataset.i; });
-});
 const res = document.getElementById('results');
-res.addEventListener('toggle', (e) => {
-  const id = e.target.dataset && e.target.dataset.id;
-  if (id) e.target.open ? openSecs.add(id) : openSecs.delete(id);
-}, true);
+trackSections(res);
 res.addEventListener('click', (e) => {
   const b = e.target.closest('[data-sens]');
   if (b) { sens[b.dataset.sens] = +b.dataset.v; render(); }
@@ -299,39 +215,4 @@ res.addEventListener('change', (e) => {
   if (e.target.id === 's-vac') sens.vacancy = e.target.checked;
   if (e.target.id === 's-exp') sens.exp = e.target.checked;
   render();
-});
-
-const root = document.documentElement, themeBtn = document.getElementById('theme');
-const curTheme = () => root.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-const paintTheme = () => { themeBtn.textContent = curTheme() === 'dark' ? 'Switch to day mode' : 'Switch to night mode'; };
-try { const saved = localStorage.getItem('theme'); if (saved) root.dataset.theme = saved; } catch (e) {}
-themeBtn.addEventListener('click', () => {
-  const next = curTheme() === 'dark' ? 'light' : 'dark';
-  root.dataset.theme = next;
-  try { localStorage.setItem('theme', next); } catch (e) {}
-  paintTheme();
-});
-paintTheme();
-
-document.getElementById('results').addEventListener('input', (e) => {
-  if (e.target.id === 'deal-name') saveName = e.target.value;
-  if (e.target.dataset.notes) {
-    const d = deals.find((x) => x.id === e.target.dataset.notes);
-    if (d) { d.notes = e.target.value; persistDeals(); }
-  }
-});
-document.getElementById('results').addEventListener('click', (e) => {
-  const b = e.target.closest('button');
-  if (!b) return;
-  if (b.hasAttribute('data-save')) {
-    if (deals.length >= MAX_DEALS) { dealMsg = `You can keep ${MAX_DEALS} deals. Delete one to save another.`; return render(); }
-    const name = saveName.trim() || `${S.state} ${$(S.price)}`;
-    deals.push({ id: String(Date.now()), name, notes: '', inputs: { ...S } });
-    persistDeals(); saveName = ''; dealMsg = `Saved "${name}".`; render();
-  } else if (b.dataset.del) {
-    deals = deals.filter((x) => x.id !== b.dataset.del); persistDeals(); dealMsg = 'Deal deleted.'; render();
-  } else if (b.dataset.load) {
-    const d = deals.find((x) => x.id === b.dataset.load);
-    if (d) { Object.assign(S, d.inputs); touched.add('construction'); touched.add('pne'); syncInputs(); dealMsg = `Loaded "${d.name}" into the calculator.`; render(); }
-  }
 });
