@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1c1713">
+<meta name="description" content="US commercial and multifamily underwriting: NOI, cap rate, DSCR, debt yield, cash-on-cash, depreciation, sale taxes, IRR and stress tests, with a plain-English note on how each figure is worked out.">
+<title>US Commercial Underwriter</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant:wght@500;600;700&family=Montserrat:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="topbar"><div class="eyebrow">United States commercial and multifamily</div><nav id="nav" aria-label="Calculators"></nav></div>
+    <h1>US Commercial Underwriter</h1>
+    <p>Build a rent roll, set the loan and exit, and see NOI, cap rate, DSCR, cash-on-cash and IRR. Each section explains how the figure is worked out.</p>
+    <button id="theme" class="themebtn" type="button"></button>
+  </header>
+  <div class="layout">
+    <aside class="card rail" aria-label="Deal inputs">
+      <div class="tabs" role="tablist" id="tabs"></div>
+      <div id="panels"></div>
+    </aside>
+    <main class="results" id="results"></main>
+  </div>
+  <footer>Illustrative only. Not financial, tax, legal or lending advice. Federal tax figures are for the 2026 tax year (IRS Rev. Proc. 2025-32); depreciation lives are 27.5 years (residential rental) and 39 years (commercial). Property tax, state tax, closing costs and lender terms are rough placeholders. Confirm every figure with leases, your lender and a tax professional.</footer>
+</div>
+<div class="pinbar" id="pinbar"></div>
+<script>window.CURRENCY = ["en-US", "USD"];</script>
+<script src="common.js"></script>
+<script src="calc-us.js"></script>
+<script src="calc-us-commercial.js"></script>
+<script src="us-commercial.js"></script>
+</body>
+</html>

@@ -3,7 +3,7 @@ const PAGES = [
   { href: 'index.html', name: 'Residential', sub: 'Australia' },
   { href: 'commercial-au.html', name: 'Commercial and multifamily', sub: 'Australia' },
   { href: 'us-residential.html', name: 'Residential', sub: 'United States' },
-  { name: 'Commercial', sub: 'United States', soon: true },
+  { href: 'us-commercial.html', name: 'Commercial and multifamily', sub: 'United States' },
 ];
 
 // US pages set window.CURRENCY = ['en-US', 'USD'] before loading this file.
