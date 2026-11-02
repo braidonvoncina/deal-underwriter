@@ -135,3 +135,5 @@ footer{padding:20px 0;color:var(--muted);font-size:12px}
 .rollhead{font-size:11.5px;color:var(--muted)}
 .rolldel{min-height:44px;border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--muted);cursor:pointer;font:500 18px var(--sans)}
 
+
+.hintmore{margin-top:6px}.hintmore summary{cursor:pointer;color:var(--accent);font-weight:600}.hintmore p{margin:8px 0 2px}.hintmore ul{margin:2px 0 0;padding-left:18px}.hintmore li{margin:4px 0}
